@@ -1,4 +1,8 @@
-### SCRIPT 1: Go from RAW SpectraMax files in the input folder to a file containing values on drug concentrations and GR values of an individual plate. The file is saved in the output folder. 
+### SCRIPT 1: 
+# Go from RAW SpectraMax files in the input folder ("1_raw_files") to a 
+# file in a folder containing values on individual organoid-experiment combinations
+# with drug concentrations and GR values of an individual plate. 
+# The file is saved in the "2_organoid_data" folder. 
 library(readxl)
 library(ggplot2)
 library(tidyverse)
@@ -7,9 +11,14 @@ library(openxlsx)
 
 rm(list=ls())
 
-# Onderstaande variabele script_dir is een manier om de locatie van het script in jouw context te krijgen. 
-# werkt alleen in RStudio. Voor alternatief vanuit de terminal (https://stackoverflow.com/questions/47044068/get-the-path-of-current-script)
+# Use code below to get the script directory if your working in Rstudio, if your 
+# not working in Rstudio but from the Terminal, use alternative option commented 
+# out directly below. 
 script_dir <- dirname(rstudioapi::getSourceEditorContext()$path)
+# script.dir <- dirname(sys.frame(1)$ofile) 
+home_dir <- dirname(script_dir)
+raw_dir <- file.path(home_dir, "1_raw_files")
+organoid_dir <- file.path(home_dir, "2_organoid_data")
+resource_dir <- file.path(home_dir, "resources")
 
 
-list.files(sources)
