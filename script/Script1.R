@@ -24,22 +24,11 @@ resource_dir <- file.path(home_dir, "resources")
 # screening_df moet een bestand inlezen waar elke organoid en elke screening
 Screening_df <- read_excel(file.path(resource_dir, "Screening_overview.xlsx"))
 
-# the list_raw_files function returns a list of all raw files in a experiment 
-# folder
-# TODO: use the list.files directly in the function to write an organoid file, 
-# skip the 'function'. 
-list_raw_files <- function(exp_id) {
-  list.files(file.path(raw_dir, exp_id))
-}
-
-# TODO: make a overarching function that joins ctrl file and exp file. It should 
-# use the org_name variable, which is either only the organoid name (org_id) or 
-# the combination of org_id and the experimental condition (exp_cond), in case
-# the differentiation was made
-
 # This function reads the ctrl_file at the location and orientation listed in 
 # the "Screening_overview.xlsx"-file located in the resources folder
-# the file should have the 'ctrl' phrase in the filename. 
+# the file should have the 'ctrl' phrase in the filename.
+# This function is called in the read_organoid function to bind it together
+# with the corresponding screening. 
 read_ctrl_file <- function(exp_id, organoid_name) {
   # TODO: plot quality of ctrl read out? Check if shouldn't have been inverted after all?
   # TODO: read out normally if position 9+, then invert automatically unless switch?
@@ -79,6 +68,14 @@ read_ctrl_file <- function(exp_id, organoid_name) {
   return(ctrl_df)
 }
 
+# The read_screen function returns a datafame with the values from the screening
+# plate pasted in the correct lane of the drugscreen setup. 
+# This works if the screeningsetup is emptied out and the names of the condition
+# have been correctly changed to something interpretable (i.e. binimetinib_lapatinib
+# instead of '2 fluids' where the binimetinib and lapatinib column contain dose
+# values.)
+# Returns an error if the setup file can't be found. 
+# This function is used in the read_organoid function. 
 read_screen <- function(exp_id, organoid_name) {
   exp_file_name <- list.files(file.path(raw_dir, exp_id), pattern=paste0("d5_", organoid_name))
   exp_file <- read_excel(file.path(raw_dir, exp_id, exp_file_name), range="B1:Z17", .name_repair = "unique_quiet")
@@ -101,6 +98,30 @@ read_screen <- function(exp_id, organoid_name) {
   exp_df
 }
 
+read_fluo <- function(org_df) {
+  fluo_reads <- org_df %>%
+    filter(condition == "Fluorescence") %>%
+    group_by(Timepoint) %>%
+    summarize(avg = mean(Value))
+  print("Found the following fluorescence values:") 
+  print(fluo_reads)
+  fluo_reads
+}
+
+# The read_organoid function returns a collated dataframe of the control and
+# screening plate, unless the read_screen function returns an error message
+# this usually means that the drug screen setup file wasn't found.
+# it will then:
+#   1. Subtract the fluorescence values of D0 and D5 from the ctrl and screening
+#   values respectively
+#   2. Use the negative control values (DMSO_1 and Tween) to calculate GR scores
+#   3. Save the excel file to a file containing screening date, STR-ID, and
+#   organoid_name variables. 
+# TODO: use fluorescence values to substract this from the respective timepoints
+# then use these corrected values to summarize control values
+# then calculate appropriate GR values
+# TODO: create workaround for GR values of Tween conditions
+# TODO: calculate Z score for plate
 read_organoid <- function(exp_id, organoid_name) {
   exp <- read_screen(exp_id, organoid_name)
   if (typeof(exp) == "character") {
@@ -108,21 +129,24 @@ read_organoid <- function(exp_id, organoid_name) {
   }
   ctrl <- read_ctrl_file(exp_id, organoid_name)
   org_df <- rbind(ctrl, exp)
+  fluo <- read_fluo(org_df)
   
-  fluo_reads <- org_df %>%
-    filter(condition == "Fluorescence") %>%
-    group_by(Timepoint) %>%
-    summarize(avg = mean(Value))
-  # TODO: use fluorescence values to substract this from the respective timepoints
-  # then use these corrected values to summarize control values
-  # then calculate appropriate GR values
-  # TODO: create workaround for GR values of Tween conditions
-  # TODO: calculate Z score for plate
+  org_df
 }
 
+apply_fluo <- function(Value, Timepoint, fluo_vec) {
+  if (Timepoint == "D0") {
+    value_corr2 <- Value - fluo_vec[1]
+  } else {
+    value_corr2 <- Value - fluo_vec[2]
+  }
+  if (value_corr2 < 0) {
+    value_corr2 <- 0
+  }
+  value_corr2
+}
 
-
-
-
-
+org_df <- read_organoid("STR17", "OPT0005")
+fluo <- read_fluo(org_df)
+fluo_vec <- pull(fluo, avg)
 
