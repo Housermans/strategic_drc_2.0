@@ -98,14 +98,53 @@ read_screen <- function(exp_id, organoid_name) {
   exp_df
 }
 
-read_fluo <- function(org_df) {
+get_fluo <- function(org_df) {
   fluo_reads <- org_df %>%
     filter(condition == "Fluorescence") %>%
     group_by(Timepoint) %>%
     summarize(avg = mean(Value))
-  print("Found the following fluorescence values:") 
-  print(fluo_reads)
-  fluo_reads
+  fluo_vec <- pull(fluo_reads, avg)
+  unlist(fluo_vec)
+}
+
+get_vehicle <- function(org_df) {
+  vehicle_reads <- c(0,0,0)
+  vehicle_reads[1] <- org_df %>%
+    filter(condition == "Tween") %>%
+    summarize(avg = mean(value_corr))
+  vehicle_reads[2] <- org_df %>%
+    filter(condition == "DMSO_1") %>%
+    summarize(avg = mean(value_corr))
+  vehicle_reads[3] <- org_df %>%
+    filter(condition == "D0_ctrl") %>%
+    summarize(avg = mean(value_corr))
+  unlist(vehicle_reads)
+}
+  
+
+apply_fluo <- function(Value, Timepoint, fluo_vec) {
+  if (Timepoint == "D0") {
+    value_corr2 <- Value - fluo_vec[1]
+  } else {
+    value_corr2 <- Value - fluo_vec[2]
+  }
+  if (value_corr2 < 0) {
+    value_corr2 <- 0
+  }
+  value_corr2
+}
+
+apply_GR <- function(value_corr, DMSO_status, Tween, DMSO, Day0) {
+  if (is.na(DMSO_status)) {
+    return(NA)
+  }
+  if (value_corr <= 0) {
+    GR <- -1
+  } else if (DMSO_status == "Y") {
+    GR <- 2^(log2(value_corr/Day0)/log2(DMSO/Day0))-1
+  } else if (DMSO_status == "N") {
+    GR <- 2^(log2(value_corr/Day0)/log2(Tween/Day0))-1
+  }
 }
 
 # The read_organoid function returns a collated dataframe of the control and
@@ -129,24 +168,57 @@ read_organoid <- function(exp_id, organoid_name) {
   }
   ctrl <- read_ctrl_file(exp_id, organoid_name)
   org_df <- rbind(ctrl, exp)
-  fluo <- read_fluo(org_df)
   
+  org_df <- org_df %>%
+    mutate(DMSO_status = case_when(
+      DMSO_pct > 0.0001 ~ "Y", 
+      DMSO_pct < 0.0001 ~ "N" 
+    ))
+  
+  # distills fluorescence control values from the experiment and then distracts these from the 
+  # appropriate value points in the experiment. If a value goes below 0, it is then set to 0
+  # as negative values have no meaning here. 
+  fluo_vec <- get_fluo(org_df)
+  for (i in 1:nrow(org_df)) {
+    org_df[i,]$value_corr <- apply_fluo(org_df[i,]$Value, org_df[i,]$Timepoint, fluo_vec)
+  }
+  
+  # Summarizes the vehicle numbers and applies the appropriate vehicle control to each condition
+  # based on the percentage of DMSO in the condition. If the percentage is above 0,1%, the DMSO status = "Y"
+  # below, the DMSO status = "N".
+  Tween <- unlist(org_df %>%
+                    filter(condition == "Tween") %>%
+                    summarize(avg = mean(value_corr))) 
+  DMSO <- unlist(org_df %>%
+                   filter(condition == "DMSO_1") %>%
+                   summarize(avg = mean(value_corr)))
+  Day0 <-unlist(org_df %>%
+                  filter(condition == "D0_ctrl") %>%
+                  summarize(avg = mean(value_corr)))
+  
+  for (i in 1:nrow(org_df)) {
+    org_df[i,]$GR <- apply_GR(org_df[i,]$value_corr, org_df[i,]$DMSO_status, Tween, DMSO, Day0)
+  }
+  org_row <- Screening_df %>%
+     filter(STR_ID==exp_id & org_name==organoid_name)
+  date_long <-  pull(org_row, Date_D0)
+  date_short <- substr(date_long, 1, 10)
+  write.xlsx(org_df, file.path(org_data_dir, paste0(paste(date_short, exp_id, organoid_name, sep="_"), ".xlsx")))
+
   org_df
+  
 }
 
-apply_fluo <- function(Value, Timepoint, fluo_vec) {
-  if (Timepoint == "D0") {
-    value_corr2 <- Value - fluo_vec[1]
-  } else {
-    value_corr2 <- Value - fluo_vec[2]
+read_experiment <- function(exp_id) {
+  experiment_orgs <- unlist(Screening_df %>%
+    filter(STR_ID==exp_id) %>%
+    select(org_name))
+  for (i in 1:length(experiment_orgs)) {
+    print(paste("Reading organoid:", experiment_orgs[i]))
+     read_organoid(exp_id, experiment_orgs[i])
   }
-  if (value_corr2 < 0) {
-    value_corr2 <- 0
-  }
-  value_corr2
 }
 
-org_df <- read_organoid("STR17", "OPT0005")
-fluo <- read_fluo(org_df)
-fluo_vec <- pull(fluo, avg)
+read_experiment("STR10")
+
 
