@@ -2,6 +2,7 @@
 .Rhistory
 .RData
 .Ruserdata
-2_organoid_data/*
-3_QC/*
-4_plot_data/*
+1_raw_files/**
+2_organoid_data/**
+3_QC/**
+4_plot_data/**
