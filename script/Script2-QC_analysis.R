@@ -14,7 +14,7 @@ raw_dir <- file.path(home_dir, "1_raw_files")
 org_data_dir <- file.path(home_dir, "2_organoid_data")
 QC_dir <- file.path(home_dir, "3_QC")
 resource_dir <- file.path(home_dir, "resources")
-plot_dir <- file.path(home_dir, "4_plots")
+plot_dir <- file.path(home_dir, "4_plot_data")
 
 overview <- read_excel(file.path(resource_dir, "Screening_overview.xlsx"))
 
@@ -73,8 +73,22 @@ Get_QC_organoid <- function(exp_id, organoid_name) {
   
   # Create a list of dataframes with names as worksheet names
   dfs <- list(experimental_data = experiment_df, controls_summary = control_df)
+  
+  QC <- read_excel(file.path(QC_dir, "QC_overview.xlsx"))
+  
+  control_vec <- as.vector(unlist(t(control_df[,2:4])), mode = "numeric")
+  control_vec <- c(exp_id, organoid_name, control_vec)
+  control_vec_df <- as.data.frame(t(control_vec))
+  colnames(control_vec_df) <- colnames(QC)
+  
+  if (exp_id %in% QC$STR_ID & organoid_name %in% QC$org_name) {
+    QC <- QC %>% filter (!(STR_ID == exp_id & org_name == organoid_name)) 
+  } 
+  QC <- rbind(QC, control_vec_df)
+  
   # Write the list to an excel file
-  write.xlsx(dfs, file = file.path(QC_dir, paste0(selected_row$STR_ID, "_" ,selected_row$org_name, "_QC_data.xlsx")))
+  write.xlsx(dfs, file = file.path(plot_dir, paste0(selected_row$STR_ID, "_" ,selected_row$org_name, "_plot_data.xlsx")))
+  write.xlsx(QC, file = file.path(QC_dir, "QC_overview.xlsx"))
 }
 
 read_experiment <- function(exp_id) {
@@ -90,74 +104,6 @@ read_experiment <- function(exp_id) {
   }
 }
 
-read_experiment("STR10")
-all_exp <- unique(overview$STR_ID)
-lapply(all_exp, read_experiment)
-
-# # Plotten van de curves met ggplot2
-# ggplot(experiment_df,
-#        aes(x = conc_condition,
-#            y = mean_GR)) +
-#   geom_point() +
-#   geom_errorbar(aes(ymin = lower_bound_95,
-#                     ymax = upper_bound_95)) +
-#   facet_wrap(~condition) +
-#   labs(x = "Concentratie",
-#        y = "Gemiddelde GR") +
-#   stat_smooth(method=drm, fct=LL.4(), se=FALSE)
-# 
-# # Maak een lege lijst om de fit objecten op te slaan
-# fit_list <- list()
-# 
-# # Loop over de unieke waarden van condition
-# for (cond in unique(experiment_df$condition)) {
-#   # Maak een subset van de data voor elke condition
-#   sub_data <- experiment_df[experiment_df$condition == cond, ]
-#   # Pas de drm functie toe op de subset data
-#   fit <- drc::drm(mean_GR ~ conc_condition, data = sub_data, fct = LL.4())
-#   # Sla het fit object op in de lijst met de naam van de condition
-#   fit_list[[cond]] <- fit
-# }
-# 
-# # Bekijk de lijst met fit objecten
-# fit_list
-# 
-# # Write a function that makes a plot for a given condition
-# plot_condition <- function(condition) {
-#   
-#   # Subset the data frame by condition using filter()
-#   df <- filter(experiment_df,
-#                condition == condition)
-#   
-#   # Make a plot with log scale x axis and adjusted range
-#   p <- ggplot(df,
-#               aes(x = conc_condition,
-#                   y = mean_GR)) +
-#     geom_point() +
-#     geom_errorbar(aes(ymin = lower_bound_95,
-#                       ymax = upper_bound_95)) +
-#     labs(x = "Concentration",
-#          y = "Mean GR",
-#          title = paste("Condition", condition)) +
-#     stat_smooth(method=drm,fct=LL.4(),se=FALSE) +
-#     
-#     # Add log scale transformation and limits
-#     scale_x_log10(limits = c(0.001,100))
-#   
-#   # Return the plot
-#   return(p)
-# }
-# 
-# # Loop over the unique values of condition
-# for (c in unique(experiment_df$condition)) {
-#   
-#   # Clear the plot device
-#   dev.off()
-#   
-#   # Call the function and assign the result to p_c
-#   p_c <- plot_condition(c)
-#   
-#   # Print out or save the plot as desired
-#   print(p_c)
-#   ggsave(p_c,file.path(plot_dir, paste("p_",c,"png",sep="")))
-# }
+# read_experiment("STR23")
+# all_exp <- unique(overview$STR_ID)
+# lapply(all_exp, read_experiment)

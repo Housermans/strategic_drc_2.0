@@ -214,9 +214,9 @@ read_organoid <- function(exp_id, organoid_name) {
 }
 
 read_experiment <- function(exp_id) {
-  experiment_orgs <- unlist(Screening_df %>%
-    filter(STR_ID==exp_id) %>%
-    select(org_name))
+  experiment_orgs <-Screening_df %>%
+    filter(STR_ID==exp_id)
+  experiment_orgs <- unique(experiment_orgs$org_name)
   for (i in 1:length(experiment_orgs)) {
     print(paste("Reading organoid:", experiment_orgs[i]))
     org <- read_organoid(exp_id, experiment_orgs[i])
@@ -226,5 +226,6 @@ read_experiment <- function(exp_id) {
   }
 }
 
+read_experiment("STR23")
 # all_exp <- unique(Screening_df$STR_ID)
 # lapply(all_exp, read_experiment)
