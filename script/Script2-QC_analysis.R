@@ -1,6 +1,5 @@
 library(dplyr)
 library(readxl)
-library(drc)
 library(ggplot2)
 library(openxlsx)
 
