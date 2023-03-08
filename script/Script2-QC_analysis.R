@@ -45,33 +45,38 @@ Get_QC_organoid <- function(exp_id, organoid_name) {
   
   
   # calculate sem for each condition and conc_condition combination
-  experiment_df <- summarize(group_by(organoid_data,
-                                      condition,
-                                      signif(conc_condition,4)),
-                             mean_GR = mean(GR),
-                             sem_GR = sd(GR) / sqrt(n()))
-  
-  # filter out control conditions
-  experiment_df <- filter(experiment_df,
+  experiment_df <- filter(organoid_data, 
                           !condition %in% c("Tween",
-                                             "DMSO_1",
-                                             "D0_ctrl",
-                                             "Fluorescence"))
-  
-  experiment_df <- rename(experiment_df, conc_condition = 'signif(conc_condition, 4)')
-  
+                                            "DMSO_1",
+                                            "D0_ctrl",
+                                            "Fluorescence")) %>%
+                    select(Organoid, condition, conc_condition, GR) %>%
+                    mutate(STR_ID = exp_id,
+                           org_name = Organoid,
+                           conc_condition = signif(conc_condition,4)) %>%
+                    group_by(STR_ID, org_name, condition, conc_condition) %>%
+                    summarise(mean_GR = mean(GR), 
+                              sem_GR = sd(GR) / sqrt(n()))
+                  
+  no_avg_df <- filter(organoid_data, 
+                      !condition %in% c("Tween", 
+                                        "DMSO_1",
+                                        "D0_ctrl",
+                                        "Fluorescence")) %>%
+              mutate(conc_condition = signif(conc_condition, 4), org_name = Organoid, STR_ID = exp_id) %>%
+              select(STR_ID, org_name, GR, condition, conc_condition) %>%
+              arrange(condition)
   
   # calculate the lower and upper bounds of the 95% confidence interval
   lower_bound_95 <- experiment_df$mean_GR - 1.96 * experiment_df$sem_GR
   upper_bound_95 <- experiment_df$mean_GR + 1.96 * experiment_df$sem_GR
   # add the new columns to the tibble
-  experiment_df <- tibble::add_column(experiment_df, lower_bound_95 = lower_bound_95,
-                              upper_bound_95 = upper_bound_95, org_name = organoid_name, STR_ID = exp_id)
-  
-  relocate(experiment_df, org_name:STR_ID, .before=condition)
+  experiment_df <- tibble::add_column(experiment_df, 
+                              lower_bound_95 = lower_bound_95,
+                              upper_bound_95 = upper_bound_95)
   
   # Create a list of dataframes with names as worksheet names
-  dfs <- list(experimental_data = experiment_df, controls_summary = control_df)
+  dfs <- list(experimental_data_average = experiment_df, experimental_data_individual = no_avg_df)
   
   QC <- read_excel(file.path(QC_dir, "QC_overview.xlsx"))
   
