@@ -1,8 +1,12 @@
 # github_guide
 Wijzigingen aan drug screen overzichten
 
-Je neemt een drug screen report
-Daarvan neem je de volgende kolommen: 
+Je neemt een drug screen report geproduceerd door TECAN 300D
+Dit is een .xml file dat geproduceerd wordt met het uitvoeren van het drugprint experiment.
+
+In dit .xml file (openen in excel of spreadsheet programma naar keuze) gebruik je de tabular tab. 
+
+Hiervan neem je de volgende kolommen: 
 (C: “Dispensed well”, D: “Dispensed row”, E: “Dispensed col”, I:”Fluid name”, J-?: “Concentration, en alle losse concentraties”, dan van volume DMSO normalization t/m DMSO %. Tussenliggende volumes laat je voor wat het is). 
 Daaraan voeg je toe: “Organoid”, “Timepoint”, “Value”, “value_corr”, “GR”, “conc_condition”. 
 Daaraan verander je de “fluid name” naar “condition”, “Conc. (Um) … drug” verander je in “conc_drug”. 
