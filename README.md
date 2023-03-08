@@ -1,4 +1,4 @@
-# github_guid
+# github_guide
 Wijzigingen aan drug screen overzichten
 
 Je neemt een drug screen report
@@ -9,7 +9,13 @@ Daaraan verander je de “fluid name” naar “condition”, “Conc. (Um) … 
 
 Alle conditions veranderd adhv script zoals hieronder: 
 
-#create variable with fluid names for combination treatmentD$condition <- ifelse(D$condition == "2 Fluids" & !is.na(D$`conc_SN-38`) & !is.na(D$conc_CHEK1), "SN38_CHEK1", D$condition)D$condition <- ifelse(D$condition == "2 Fluids" & !is.na(D$conc_Lapatinib) & !is.na(D$conc_Binimetinib), "binimetinib_lapatinib", D$condition) D$condition <- ifelse(D$condition == "2 Fluids" & !is.na(D$conc_Alpelisib) & !is.na(D$conc_Binimetinib), "binimetinib_alpelisib", D$condition) D$condition <- ifelse(D$condition == "2 Fluids" & !is.na(D$conc_Lapatinib) & !is.na(D$conc_Alpelisib), "alpelisib_lapatinib", D$condition) D$condition <- ifelse(D$condition == "2 Fluids" & !is.na(D$conc_Vinorelbine) & !is.na(D$conc_Navitoclax), "navitoclax_vinorelbine", D$condition)D$condition <- ifelse(D$condition == "3 Fluids", "vi_bi_la", D$condition) 
+#create variable with fluid names for combination treatment
+D$condition <- ifelse(D$condition == "2 Fluids" & !is.na(D$`conc_SN-38`) & !is.na(D$conc_CHEK1), "SN38_CHEK1", D$condition)
+D$condition <- ifelse(D$condition == "2 Fluids" & !is.na(D$conc_Lapatinib) & !is.na(D$conc_Binimetinib), "binimetinib_lapatinib", D$condition) 
+D$condition <- ifelse(D$condition == "2 Fluids" & !is.na(D$conc_Alpelisib) & !is.na(D$conc_Binimetinib), "binimetinib_alpelisib", D$condition) 
+D$condition <- ifelse(D$condition == "2 Fluids" & !is.na(D$conc_Lapatinib) & !is.na(D$conc_Alpelisib), "alpelisib_lapatinib", D$condition) 
+D$condition <- ifelse(D$condition == "2 Fluids" & !is.na(D$conc_Vinorelbine) & !is.na(D$conc_Navitoclax), "navitoclax_vinorelbine", D$condition)
+D$condition <- ifelse(D$condition == "3 Fluids", "vi_bi_la", D$condition) 
 
 De conc_condition die maak je als volgt in excel: 
 =IF(NOT(ISBLANK(K4));K4;IF(I4="vi_bi_la";T4;MAX(K4:T4)))
