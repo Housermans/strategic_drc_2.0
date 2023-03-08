@@ -5,7 +5,6 @@
 # The file is saved in the "2_organoid_data" folder. 
 library(readxl)
 library(ggplot2)
-library(tidyverse)
 library(dplyr)
 library(openxlsx)
 
@@ -226,6 +225,6 @@ read_experiment <- function(exp_id) {
   }
 }
 
-read_experiment("STR23")
+read_experiment("STR27")
 # all_exp <- unique(Screening_df$STR_ID)
 # lapply(all_exp, read_experiment)

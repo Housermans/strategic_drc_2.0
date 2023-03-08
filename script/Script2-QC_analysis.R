@@ -108,6 +108,6 @@ read_experiment <- function(exp_id) {
   }
 }
 
-# read_experiment("STR23")
+read_experiment("STR27")
 # all_exp <- unique(overview$STR_ID)
 # lapply(all_exp, read_experiment)

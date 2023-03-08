@@ -15,7 +15,8 @@ Add the following columns for condition: “Value”, “value_corr”, “GR”
 place the value 0.01 in each cell of the first row of the three columns so that it is clear that this will contain a numerical (float) value
 Add the following column to after Concentration: “conc_condition”.
 Change the name of column “fluid name” to “condition”,
-Change the name of column “Conc. (Um) <drug>” to “conc_<drug>”.
+Change the name of column “Conc. (Um) <drug>” to “conc_<drug>”. 
+(use excel formula: =SUBSTITUTE(M1;CHAR(13);"") to get rid of the new line character)
 Change the name of column “DMSO \%” to “DMSO_pct”
 
 All conditions changed using an R script as below:
