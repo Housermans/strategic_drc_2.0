@@ -99,7 +99,7 @@ Get_QC_organoid <- function(exp_id, organoid_name) {
   # Write the list to an excel file
   write.xlsx(dfs, file = file.path(plot_dir, paste0(selected_row$STR_ID, "_" ,selected_row$org_name, "_plot_data.xlsx")))
   # saveWorkbook(QC_wb, file = file.path(QC_dir, "QC_overview.xlsx"), overwrite = TRUE)
-  write.xlsx(QC, file = file.path(QC_dir, "QC_overview.xlsx"), asTable=TRUE, colWidths ="auto", numFmt="#.##0,00")
+  write.xlsx(QC, file = file.path(QC_dir, "QC_overview.xlsx"), colWidths ="auto", numFmt="#.##0,00")
 }
 
 Plot_controls <- function(exp_id, organoid_name, set_binwidth = 300) {
@@ -185,5 +185,5 @@ read_experiment <- function(exp_id) {
 # read_experiment("STR24B")
 
 ### USE THIS TO PROCESS ALL EXPERIMENTS
-all_exp <- unique(overview$STR_ID)
-lapply(all_exp, read_experiment)
+# all_exp <- unique(overview$STR_ID)
+# lapply(all_exp, read_experiment)

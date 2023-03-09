@@ -9,7 +9,7 @@ home_dir <- dirname(script_dir)
 resource_dir <- file.path(home_dir, "resources")
 
 # Read the .xml file as a data frame
-D <- read_excel(file.path(resource_dir,"FullscreenV3.xlsx"))
+D <- read_excel(file.path(resource_dir,"FullscreenV2_inverted.xlsx"))
 
 D <- D %>%
   rename(
@@ -55,7 +55,7 @@ D <- D %>%
                                  conc_Vinorelbine,
                                  conc_condition))
 
-write.xlsx(D, file.path(resource_dir,"FullscreenV3.xlsx"),  asTable=TRUE)
+write.xlsx(D, file.path(resource_dir,"FullscreenV2_inverted.xlsx"))
 
 # # Rename some columns
 # drug_screen <- drug_screen %>%

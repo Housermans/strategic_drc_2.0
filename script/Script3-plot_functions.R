@@ -21,7 +21,6 @@ plot_output <- file.path(home_dir, "5_plot_output")
 
 overview <- read_excel(file.path(resource_dir, "Screening_overview.xlsx"))
 
-Analyse <- overview %>% filter(Analyse == 1)
 read_plot_data <- function(exp_id, organoid_name) {
   
   exp_file_name <- list.files(file.path(plot_dir), pattern=paste(exp_id, organoid_name, sep="_"))
@@ -35,23 +34,6 @@ read_plot_data <- function(exp_id, organoid_name) {
   organoid_data
 }
 
-read_experiment <- function() {
-  Analyse <- overview %>% filter(Analyse == 1)
-  status <- Analyse %>% dplyr::select(STR_ID, org_name, chemo_naive, RASTRIC)
-  d <- read_plot_data(Analyse[1, "STR_ID"], Analyse[1, "org_name"])
-  for (n in 2:nrow(Analyse)) {
-    r <- read_plot_data(Analyse[n, "STR_ID"], Analyse[n, "org_name"])
-    d <- rbind(d, r)
-  }
-  d <- left_join(d, status, by=c("STR_ID", "org_name"))
-  d$chemo_naive <- as.factor(d$chemo_naive)
-  levels(d$chemo_naive) <- c("no", "yes")
-  d$RASTRIC <- as.factor(d$RASTRIC)
-  levels(d$RASTRIC) <- c("no", "yes")
-  d
-}
-d <- read_experiment()
-
 # organoids = unique(d$org_name)
 # conditions = unique(d$condition)
 
@@ -59,7 +41,7 @@ plot_per_condition <- function(df, condition) {
   df <- df[df$condition == condition, ]
   title <- condition
   
-  n1 <- length(unlist(unique(d$org_name)))               # Amount of default colors
+  n1 <- length(unlist(unique(df$org_name)))               # Amount of default colors
   hex_codes1 <- hue_pal()(n1)                             # Identify hex codes
   
   # create an empty list to store the nplr models
@@ -67,7 +49,7 @@ plot_per_condition <- function(df, condition) {
   
   # loop over the unique organoids in the condition
   for (organoid in unique(df$org_name)) {
-    print(paste("plotting", organoid))
+    print(paste("plotting", organoid, "on", condition, "by individual colors"))
     organoid_data = df[df$org_name == organoid, ]
     organoid_data$Max_Concentration_log <- log10(organoid_data$conc_condition)
     
@@ -129,7 +111,7 @@ plot_per_condition_factorial <- function(df, condition, colorby="chemo_naive") {
   df <- df[df$condition == condition, ]
   title <- condition
   
-  n1 <- length(unlist(unique(d[colorby])))               # Amount of default colors
+  n1 <- length(unlist(unique(df[colorby])))               # Amount of default colors
   hex_codes1 <- hue_pal()(n1)                             # Identify hex codes
   
   # create an empty list to store the nplr models
@@ -137,7 +119,7 @@ plot_per_condition_factorial <- function(df, condition, colorby="chemo_naive") {
   
   # loop over the unique organoids in the condition
   for (organoid in unique(df$org_name)) {
-    print(paste("plotting", organoid))
+    print(paste("plotting", organoid, "on", condition, "by", colorby))
     organoid_data = df[df$org_name == organoid, ]
     organoid_data$Max_Concentration_log <- log10(organoid_data$conc_condition)
     
@@ -199,21 +181,59 @@ plot_per_condition_factorial <- function(df, condition, colorby="chemo_naive") {
   return(p)
 }
 
-plot_multiple <- function(df, exp_name, plot_Tween=FALSE, plot_DMSO=FALSE) {
-  Tween_conditions = c("5-FU", "Oxaliplatin")
-  # if (plot_Tween) {
-  #   
-  # }
-  for (condition in unique(df$condition)) {
+select_files_and_add_metadata <- function(select_on = "Analyse", plot_condition = "all", selection_value = 1, metadata=c("chemo_naive", "RASTRIC", "Passed_QC", "Tween_bad", "DMSO_bad")) {
+  if(select_on == "all") {
+    Analyse <- overview %>% filter(Data_processed == 1)
+  } else {
+    Analyse <- overview %>% filter(get(select_on) == selection_value)
+  }
+  status <- Analyse %>% dplyr::select(STR_ID, org_name, all_of(metadata))
+  d <- read_plot_data(Analyse[1, "STR_ID"], Analyse[1, "org_name"])
+  for (n in 2:nrow(Analyse)) {
+    r <- read_plot_data(Analyse[n, "STR_ID"], Analyse[n, "org_name"])
+    d <- rbind(d, r)
+  }
+  d <- left_join(d, status, by=c("STR_ID", "org_name"))
+  d <- d %>% mutate(across(all_of(metadata), .fns = ~factor(.,levels = c(0,1), labels = c("no", "yes"))))
+  if (!plot_condition == "all") {
+    d <- d %>% filter(condition == plot_condition)
+  } 
+  # d$chemo_naive <- as.factor(d$chemo_naive)
+  # levels(d$chemo_naive) <- c("no", "yes")
+  # d$RASTRIC <- as.factor(d$RASTRIC)
+  # levels(d$RASTRIC) <- c("no", "yes")
+  d
+}
+# d <- select_files_and_add_metadata(select_on = "all")
+
+
+# TODO: plot_Tween=FALSE, plot_DMSO=FALSE, om specifiek de Tween/DMSO plotjes te maken.
+plot_multiple <- function(exp_name, select_on="Analyse", selection_value=1, colorby="chemo_naive") {
+  if (!dir.exists(file.path(plot_output, exp_name))) {
+    dir.create(file.path(plot_output, exp_name))
+  }
+  d <- select_files_and_add_metadata(select_on = select_on)
+  for (condition in unique(d$condition)) {
     p <- plot_per_condition(d, condition)
-    q <- plot_per_condition_factorial(df, condition, colorby="chemo_naive")
+    q <- plot_per_condition_factorial(d, condition, colorby=colorby)
     p_and_q <- p + q
-    ggsave(file.path(plot_output, paste0(condition,"_", exp_name, "_plots.png")), p_and_q, width=4200, height=2100, units="px")
+    ggsave(file.path(plot_output, exp_name, paste0(condition,"_", exp_name, "_plots.png")), p_and_q, width=4200, height=2100, units="px")
   }
 }
 
+plot_single <- function(exp_name, condition, select_on="Analyse", selection_value=1, colorby="chemo_naive") {
+  if (!dir.exists(file.path(plot_output, exp_name))) {
+    dir.create(file.path(plot_output, exp_name))
+  }
+  d <- select_files_and_add_metadata(select_on = select_on, plot_condition = condition)
+  p <- plot_per_condition(d, condition)
+  q <- plot_per_condition_factorial(d, condition, colorby=colorby)
+  p_and_q <- p + q
+  ggsave(file.path(plot_output, exp_name, paste0(condition,"_", exp_name, "_plots.png")), p_and_q, width=4200, height=2100, units="px")
+}
 
-
+# plot_multiple("plot_qc", select_on="Passed_QC")
+# plot_multiple("plot_all", select_on="all", colorby="Passed_QC")
 
 # plot_organoid_with_data <- function(df, condition, n=1, save=F) {
 #   df <- df[df$condition == condition, ]
