@@ -23,7 +23,7 @@ overview <- read_excel(file.path(resource_dir, "Screening_overview.xlsx"))
 
 read_plot_data <- function(exp_id, organoid_name) {
   
-  exp_file_name <- list.files(file.path(plot_dir), pattern=paste(exp_id, organoid_name, sep="_"))
+  exp_file_name <- list.files(file.path(plot_dir), pattern=paste0(exp_id, "_", organoid_name,"_plot_data.xlsx"))
     
   if (length(exp_file_name) == 0) {
     return(paste("ERROR: Combination of", exp_id, "and", organoid_name, "does not exist in this folder!"))
@@ -151,7 +151,9 @@ plot_per_condition_factorial <- function(df, condition, colorby="chemo_naive") {
     dataframe_fit_i <- data.frame(getXcurve(fit), getYcurve(fit))
     colnames(dataframe_fit_i) <- c("Concentration_1", "y_fit")
     df_filtered <- filter(df, org_name == names(fit_list)[i])
-    selection_var <- df_filtered["chemo_naive"][[1]][1]
+    # selection_var <- df_filtered["chemo_naive"][[1]][1]
+    selection_vec <- df_filtered %>% pull(get(colorby))
+    selection_var <- selection_vec[1]
     
     min_organoid = min(df[df$org_name == names(fit_list)[i], ]$mean_GR)
     max_organoid = max(df[df$org_name == names(fit_list)[i], ]$mean_GR)
@@ -170,7 +172,7 @@ plot_per_condition_factorial <- function(df, condition, colorby="chemo_naive") {
   
   # plot all the organoids with different colors based on their org_name
   p <- ggplot() + 
-    geom_point(data = df, aes(conc_condition, mean_GR, group=org_name, color = !!sym(colorby)), size = 2) +
+    geom_point(data = df, aes(conc_condition, mean_GR, group=org_name, color = get(colorby))) +
     geom_line(data = dataframe_fit, aes(x = 10^Concentration_1, y = y_fit_original, group=org_name, color = colorby)) +
     scale_color_manual(values = hex_codes1) + # use your custom colors here
     labs (x= "Concentration (log10) uM", y="GR", main = condition, color = colorby) +  
@@ -181,7 +183,7 @@ plot_per_condition_factorial <- function(df, condition, colorby="chemo_naive") {
   return(p)
 }
 
-select_files_and_add_metadata <- function(select_on = "Analyse", plot_condition = "all", selection_value = 1, metadata=c("chemo_naive", "RASTRIC", "Passed_QC", "Tween_bad", "DMSO_bad")) {
+select_files_and_add_metadata <- function(select_on = "Analyse", plot_condition = "all", selection_value = 1, metadata=c("chemo_naive", "RASTRIC", "Passed_QC", "Tween_bad", "DMSO_bad", "RASTRIC_SD")) {
   if(select_on == "all") {
     Analyse <- overview %>% filter(Data_processed == 1)
   } else {
@@ -225,16 +227,42 @@ plot_single <- function(exp_name, condition, select_on="Analyse", selection_valu
   if (!dir.exists(file.path(plot_output, exp_name))) {
     dir.create(file.path(plot_output, exp_name))
   }
-  d <- select_files_and_add_metadata(select_on = select_on, plot_condition = condition)
+  d <- select_files_and_add_metadata(select_on = select_on, plot_condition = condition, selection_value = selection_value)
   p <- plot_per_condition(d, condition)
   q <- plot_per_condition_factorial(d, condition, colorby=colorby)
   p_and_q <- p + q
   ggsave(file.path(plot_output, exp_name, paste0(condition,"_", exp_name, "_plots.png")), p_and_q, width=4200, height=2100, units="px")
 }
 
+plot_tween <- function(exp_name, select_on="Tween_bad", selection_value = 0, colorby="chemo_naive") {
+  for (condition in c("5-FU", "Oxaliplatin")) {
+    plot_single(exp_name = exp_name, condition = condition, select_on=select_on, selection_value=selection_value, colorby=colorby)
+  }
+}
+
+plot_dmso <- function(exp_name, select_on="DMSO_bad", selection_value = 0, colorby="chemo_naive") {
+  d <- select_files_and_add_metadata(select_on = select_on, selection_value = selection_value)
+  for (condition in unique(d$condition)) {
+    if (!condition %in% c("5-FU", "Oxaliplatin")) {
+      plot_single(exp_name = exp_name, condition = condition, select_on=select_on, selection_value=selection_value, colorby=colorby)
+    }
+  }
+}
+
+# plot_multiple("STR-D2")
 # plot_multiple("plot_qc", select_on="Passed_QC")
 # plot_multiple("plot_all", select_on="all", colorby="Passed_QC")
+plot_multiple("WNT", colorby="Tween_bad")
 
+
+# These function plot only those that have been checked to have good tween and dmso controls:
+# plot_tween("Good_tween_dmso")
+# plot_dmso("Good_tween_dmso")
+
+
+
+
+# TODO: get AUCs of organoid data
 # plot_organoid_with_data <- function(df, condition, n=1, save=F) {
 #   df <- df[df$condition == condition, ]
 #   title <- condition

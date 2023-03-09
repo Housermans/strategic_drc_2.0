@@ -76,26 +76,47 @@ read_ctrl_file <- function(exp_id, organoid_name) {
 # Returns an error if the setup file can't be found. 
 # This function is used in the read_organoid function. 
 read_screen <- function(exp_id, organoid_name) {
-
+  org_row <- Screening_df %>%
+    filter(STR_ID==exp_id & org_name==organoid_name)
+  setup_path <- file.path(resource_dir, pull(org_row, screen_setup))
+  
   exp_file_name <- list.files(file.path(raw_dir, exp_id), pattern=paste0("d5_", organoid_name, ".xlsx"))
   if (length(exp_file_name) == 0) {
     return(paste("ERROR: Combination of", exp_id, "and", organoid_name, "does not exist in this folder!"))
   }
-  exp_file <- read_excel(file.path(raw_dir, exp_id, exp_file_name), range="B1:Z17", .name_repair = "unique_quiet")
-  org_row <- Screening_df %>%
-    filter(STR_ID==exp_id & org_name==organoid_name)
-  setup_path <- file.path(resource_dir, pull(org_row, screen_setup))
+  if (startsWith(pull(org_row, screen_setup), "HalfScreen")) {
+    halfscreen <- TRUE
+    print(paste("Reading out", exp_id, organoid_name, "as a HalfScreen experiment"))
+    exp_file <- read_excel(file.path(raw_dir, exp_id, exp_file_name), range="B1:Z9", .name_repair = "unique_quiet")
+  } else {
+    # Normal full 384 well plate
+    exp_file <- read_excel(file.path(raw_dir, exp_id, exp_file_name), range="B1:Z17", .name_repair = "unique_quiet")
+  }
+  
   if (file.exists(setup_path)) {
     exp_df <- read_excel(setup_path)
   } else {
     return(paste("ERROR: Can't find", setup_path))
   }
-  exp_df$Organoid <- rep(organoid_name, 384)
-  i = 1
-  for (row in 1:16) {
-    for (column in 2:25) {
-      exp_df[i, 'Value'] <- exp_file[[row, column]]
-      i <- i+1
+  if (startsWith(pull(org_row, screen_setup), "HalfScreen")) {
+    # reading out a half screen experiment
+    exp_df$Organoid <- rep(organoid_name, 192)
+    i = 1
+    for (row in 1:8) {
+      for (column in 2:25) {
+        exp_df[i, 'Value'] <- exp_file[[row, column]]
+        i <- i+1
+      }
+    }
+  } else {
+    # reading out a normal screen (full plate) experiment
+    exp_df$Organoid <- rep(organoid_name, 384)
+    i = 1
+    for (row in 1:16) {
+      for (column in 2:25) {
+        exp_df[i, 'Value'] <- exp_file[[row, column]]
+        i <- i+1
+      }
     }
   }
   exp_df
@@ -225,6 +246,8 @@ read_experiment <- function(exp_id) {
   }
 }
 
-# read_experiment("STR24A")
+# read_screen(exp_id = "STR24A", organoid_name = "OPT0424_WNT_high")
+read_experiment("STR24A")
+read_experiment("STR24B")
 # all_exp <- unique(Screening_df$STR_ID)
 # lapply(all_exp, read_experiment)

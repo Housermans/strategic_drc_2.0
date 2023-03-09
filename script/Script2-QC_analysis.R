@@ -33,15 +33,17 @@ Get_QC_organoid <- function(exp_id, organoid_name) {
   organoid_data <- read_excel(file.path(org_data_dir, filename))
   
   # filter for control conditions
-  control_df <- summarize(group_by(organoid_data, condition), mean_value = mean(Value), median_value = median(Value), sd_Value = sd(Value))
-  control_df <- filter(control_df, condition %in% c("Tween", "DMSO_1", "D0_ctrl", "Fluorescence"))
-  
-  neg_ctrl1 <- filter(organoid_data, condition == "Navitoclax", conc_condition > 19)
-  neg_ctrl2 <- filter(organoid_data, condition == "Oxaliplatin", conc_condition > 900)
-  neg_ctrl <- rbind(neg_ctrl1, neg_ctrl2)
-  neg_ctrl <- summarize(group_by(neg_ctrl, condition), mean_value = mean(Value), median_value = median(Value), sd_Value = sd(Value))
-  
-  control_df <- rbind(control_df, neg_ctrl)
+  # control_df <- summarize(group_by(organoid_data, condition), mean_value = mean(Value), median_value = median(Value), sd_Value = sd(Value))
+  # control_df <- filter(control_df, condition %in% c("Tween", "DMSO_1", "D0_ctrl", "Fluorescence"))
+  # 
+  # neg_ctrl1 <- filter(organoid_data, condition == "Navitoclax", conc_condition > 19)
+  # if (length(neg_ctrl1) == 0) {neg_ctrl1 <- c(NA, NA, NA)}
+  # neg_ctrl2 <- filter(organoid_data, condition == "Oxaliplatin", conc_condition > 900)
+  # if (length(neg_ctrl2) == 0) {neg_ctrl1 <- c(NA, NA, NA)}
+  # neg_ctrl <- rbind(neg_ctrl1, neg_ctrl2)
+  # neg_ctrl <- summarize(group_by(neg_ctrl, condition), mean_value = mean(Value), median_value = median(Value), sd_Value = sd(Value))
+  # 
+  # control_df <- rbind(control_df, neg_ctrl)
   
   
   # calculate sem for each condition and conc_condition combination
@@ -81,15 +83,15 @@ Get_QC_organoid <- function(exp_id, organoid_name) {
   QC <- read_excel(file.path(QC_dir, "QC_overview.xlsx"))
   # QC_wb <- loadWorkbook(file.path(QC_dir, "QC_overview.xlsx"))
   
-  control_vec <- as.vector(unlist(t(control_df[,2:4])), mode = "numeric")
-  control_vec <- c(exp_id, organoid_name, control_vec)
-  control_vec_df <- as.data.frame(t(control_vec))
-  colnames(control_vec_df) <- colnames(QC)
+  # control_vec <- as.vector(unlist(t(control_df[,2:4])), mode = "numeric")
+  # control_vec <- c(exp_id, organoid_name, control_vec)
+  # control_vec_df <- as.data.frame(t(control_vec))
+  # colnames(control_vec_df) <- colnames(QC)
   
-  if (exp_id %in% QC$STR_ID & organoid_name %in% QC$org_name) {
-    QC <- QC %>% filter (!(STR_ID == exp_id & org_name == organoid_name)) 
-  } 
-  QC <- rbind(QC, control_vec_df)
+  # if (exp_id %in% QC$STR_ID & organoid_name %in% QC$org_name) {
+  #   QC <- QC %>% filter (!(STR_ID == exp_id & org_name == organoid_name)) 
+  # } 
+  # QC <- rbind(QC, control_vec_df)
   
   # replace the sheet in the Excel file
   # removeWorksheet(QC_wb, sheet="Sheet 1")
@@ -99,7 +101,7 @@ Get_QC_organoid <- function(exp_id, organoid_name) {
   # Write the list to an excel file
   write.xlsx(dfs, file = file.path(plot_dir, paste0(selected_row$STR_ID, "_" ,selected_row$org_name, "_plot_data.xlsx")))
   # saveWorkbook(QC_wb, file = file.path(QC_dir, "QC_overview.xlsx"), overwrite = TRUE)
-  write.xlsx(QC, file = file.path(QC_dir, "QC_overview.xlsx"), colWidths ="auto", numFmt="#.##0,00")
+  # write.xlsx(QC, file = file.path(QC_dir, "QC_overview.xlsx"), colWidths ="auto", numFmt="#.##0,00")
 }
 
 Plot_controls <- function(exp_id, organoid_name, set_binwidth = 300) {
@@ -182,7 +184,8 @@ read_experiment <- function(exp_id) {
 }
 
 ### USE THIS TO READ OUT A SPECIFIC EXPERIMENT 
-# read_experiment("STR24B")
+read_experiment("STR24A")
+read_experiment("STR24B")
 
 ### USE THIS TO PROCESS ALL EXPERIMENTS
 # all_exp <- unique(overview$STR_ID)

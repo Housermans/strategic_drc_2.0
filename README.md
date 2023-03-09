@@ -6,6 +6,8 @@ You take a drug screen report produced by TECAN 300D This is an .xml file that i
 
 In this .xml file (open in excel or spreadsheet program of your choice) you use the tabular tab.
 
+Delete all rows below 386 (so that you read one plate at a time)
+
 From this you copy the following columns to a new excel file: C: “Dispensed well” D: “Dispensed row”, E: “Dispensed col” From I: “Fluid name” all columns starting with "Conc. " The last 4 columns: “Volume (nL) DMSO normalization”, “Volume (nL) a+Tw normalization”, “Total well volume (nL)”, “DMSO \%”
 
 add the following columns for Dispensedwell: “Organoid”, “Timepoint”,
