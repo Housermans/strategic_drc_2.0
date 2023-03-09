@@ -77,7 +77,7 @@ read_ctrl_file <- function(exp_id, organoid_name) {
 # This function is used in the read_organoid function. 
 read_screen <- function(exp_id, organoid_name) {
 
-  exp_file_name <- list.files(file.path(raw_dir, exp_id), pattern=paste0("d5_", organoid_name))
+  exp_file_name <- list.files(file.path(raw_dir, exp_id), pattern=paste0("d5_", organoid_name, ".xlsx"))
   if (length(exp_file_name) == 0) {
     return(paste("ERROR: Combination of", exp_id, "and", organoid_name, "does not exist in this folder!"))
   }
@@ -206,7 +206,7 @@ read_organoid <- function(exp_id, organoid_name) {
      filter(STR_ID==exp_id & org_name==organoid_name)
   date_long <-  pull(org_row, Date_D0)
   date_short <- substr(date_long, 1, 10)
-  write.xlsx(org_df, file.path(org_data_dir, paste0(paste(date_short, exp_id, organoid_name, sep="_"), ".xlsx")))
+  write.xlsx(org_df, file.path(org_data_dir, paste0(paste(date_short, exp_id, organoid_name, sep="_"), ".xlsx")), asTable=TRUE)
 
   org_df
   
@@ -225,6 +225,6 @@ read_experiment <- function(exp_id) {
   }
 }
 
-read_experiment("STR27")
+read_experiment("STR24A")
 # all_exp <- unique(Screening_df$STR_ID)
 # lapply(all_exp, read_experiment)

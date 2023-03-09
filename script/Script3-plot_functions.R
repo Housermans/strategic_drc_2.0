@@ -199,10 +199,14 @@ plot_per_condition_factorial <- function(df, condition, colorby="chemo_naive") {
   return(p)
 }
 
-plot_multiple <- function(exp_name) {
-  for (condition in unique(d$condition)) {
+plot_multiple <- function(df, exp_name, plot_Tween=FALSE, plot_DMSO=FALSE) {
+  Tween_conditions = c("5-FU", "Oxaliplatin")
+  # if (plot_Tween) {
+  #   
+  # }
+  for (condition in unique(df$condition)) {
     p <- plot_per_condition(d, condition)
-    q <- plot_per_condition_factorial(d, condition, colorby="chemo_naive")
+    q <- plot_per_condition_factorial(df, condition, colorby="chemo_naive")
     p_and_q <- p + q
     ggsave(file.path(plot_output, paste0(condition,"_", exp_name, "_plots.png")), p_and_q, width=4200, height=2100, units="px")
   }
