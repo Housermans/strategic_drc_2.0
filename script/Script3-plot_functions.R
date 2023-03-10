@@ -183,7 +183,7 @@ plot_per_condition_factorial <- function(df, condition, colorby="chemo_naive") {
   return(p)
 }
 
-select_files_and_add_metadata <- function(select_on = "Analyse", plot_condition = "all", selection_value = 1, metadata=c("chemo_naive", "RASTRIC", "Passed_QC", "Tween_bad", "DMSO_bad", "RASTRIC_SD")) {
+select_files_and_add_metadata <- function(select_on = "Analyse", plot_condition = "all", selection_value = 1, metadata=c("chemo_naive", "RASTRIC", "Passed_QC", "Tween_bad", "DMSO_bad", "RASTRIC_SD", "Analyse", "Analyse2")) {
   if(select_on == "all") {
     Analyse <- overview %>% filter(Data_processed == 1)
   } else {
@@ -234,16 +234,18 @@ plot_single <- function(exp_name, condition, select_on="Analyse", selection_valu
   ggsave(file.path(plot_output, exp_name, paste0(condition,"_", exp_name, "_plots.png")), p_and_q, width=4200, height=2100, units="px")
 }
 
-plot_tween <- function(exp_name, select_on="Tween_bad", selection_value = 0, colorby="chemo_naive") {
-  for (condition in c("5-FU", "Oxaliplatin")) {
+
+
+plot_selected_conditions <- function(exp_name, select_on="Passed_QC", selection_value = 1, colorby="chemo_naive", selected_conditions=c("5-FU", "Oxaliplatin")) {
+  for (condition in selected_conditions) {
     plot_single(exp_name = exp_name, condition = condition, select_on=select_on, selection_value=selection_value, colorby=colorby)
   }
 }
 
-plot_dmso <- function(exp_name, select_on="DMSO_bad", selection_value = 0, colorby="chemo_naive") {
+dont_plot_selected_conditions <- function(exp_name, select_on="Passed_QC", selection_value = 1, colorby="chemo_naive",  unselected_conditions=c("5-FU", "Oxaliplatin")) {
   d <- select_files_and_add_metadata(select_on = select_on, selection_value = selection_value)
   for (condition in unique(d$condition)) {
-    if (!condition %in% c("5-FU", "Oxaliplatin")) {
+    if (!condition %in% unselected_conditions) {
       plot_single(exp_name = exp_name, condition = condition, select_on=select_on, selection_value=selection_value, colorby=colorby)
     }
   }
@@ -252,11 +254,12 @@ plot_dmso <- function(exp_name, select_on="DMSO_bad", selection_value = 0, color
 # plot_multiple("STR-D2")
 # plot_multiple("plot_qc", select_on="Passed_QC")
 # plot_multiple("plot_all", select_on="all", colorby="Passed_QC")
-plot_multiple("WNT", colorby="Tween_bad")
+# plot_multiple("WNT", colorby="Tween_bad")
 
 
 # These function plot only those that have been checked to have good tween and dmso controls:
-# plot_tween("Good_tween_dmso")
+plot_selected_conditions("WNT_selected", select_on="Analyse2")
+plot_selected_conditions("WNT_selected", select_on="Analyse", selected_conditions=c("SN-38", "Lapatinib", "Binimetinib", "CHEK1", "vi_bi_la"))
 # plot_dmso("Good_tween_dmso")
 
 
