@@ -40,8 +40,13 @@ read_ctrl_file <- function(exp_id, organoid_name) {
   # The orientation should be listed in the screening_overview file is pulled here 
   org_row <- Screening_df %>%
     filter(STR_ID==exp_id & org_name==organoid_name)
-  inverted <-  pull(org_row, D0_inverted)
+  # inverted <-  pull(org_row, D0_inverted)
   position <-  pull(org_row, D0_rowstart)
+  if (position > 8) {
+    inverted <- 1
+  } else {
+    inverted <- 0
+  }
   # a 2x24 matrix is created from the raw file at the location that the organoid is supposed to be
   # either the first or last column (depending on orientation) is left empty for the 'fluorescence' aka empty wells. 
   # the file is then converted to match the experiment file so that they can be joined in the read_organoid function
@@ -247,7 +252,7 @@ read_experiment <- function(exp_id) {
 }
 
 # read_screen(exp_id = "STR24A", organoid_name = "OPT0424_WNT_high")
-read_experiment("STR24A")
-read_experiment("STR24B")
+# read_experiment("STR12")
+# read_experiment("STR24B")
 # all_exp <- unique(Screening_df$STR_ID)
 # lapply(all_exp, read_experiment)
