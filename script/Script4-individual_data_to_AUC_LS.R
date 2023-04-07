@@ -6,6 +6,7 @@ library(scales)
 library(drc)
 library(nplr)
 library(patchwork)
+library(DescTools) #AUC
 
 rm(list=ls())
 
@@ -19,6 +20,7 @@ resource_dir <- file.path(home_dir, "resources")
 plot_dir <- file.path(home_dir, "4_plot_data")
 plot_output <- file.path(home_dir, "5_plot_output")
 metrics_dir <- file.path(home_dir, "6_metrics")
+metrics_plot_dir <- file.path(metrics_dir, "Plots metrics")
 
 overview <- read_excel(file.path(resource_dir, "Screening_overview.xlsx"))
 
@@ -59,27 +61,27 @@ select_files_and_add_metadata <- function(select_on = "Analyse", plot_condition 
   d
 }
 
-# TODO: get AUCs of organoid data
-save_AUC <- function(exp_name, 
-                     select_on="org_id", 
-                     selection_value = "RAS25", 
+save_metrics <- function(exp_name, 
+                     select_on="Passed_QC", 
+                     selection_value = 1, 
                      selected_conditions="all" # of c("5-FU", "Oxaliplatin", "etc.")) 
 ) {
   
-  if (!dir.exists(file.path(metrics_dir, exp_name))) {
-    dir.create(file.path(metrics_dir, exp_name))
-  }
+    # create an empty data frame to store the fitted values
+  dataframe_conditions <- data.frame()
   
-  df_metrics <- tibble(condition = numeric(), 
-              organoid = numeric(), 
-              AUC_raw = numeric(), 
-              AUC_fit_trapezoid = numeric(), 
-              GRMax = numeric(), 
-              GR50 = numeric()
-  )
+#DIT WERKT WEL
+  
+test <- c("5-FU", "vi_bi_la", "Oxaliplatin", "Lapatinib", "Binimetinib", "Alpelisib", "Navitoclax", "CHEK1", "SN-38" ,
+          "alpelisib_lapatinib",  "binimetinib_lapatinib", "SN38_CHEK1", "alpelisib_lapatinib", "Vinorelbine", "binimetinib_alpelisib", "navitoclax_vinorelbine")
+  for (condition in test) {
+    
+#EN DIT WERKT NIET  
+#  for (condition in selected_conditions) {
+
   
   # TO DO: make selection for individual metrics etc.
-  d <- select_files_and_add_metadata(select_on = select_on, selection_value = selection_value)
+  d <- select_files_and_add_metadata(select_on = select_on, selection_value = selection_value, plot_condition = condition)
   d_individual <- select_files_and_add_metadata(select_on = select_on, selection_value = selection_value, individual_reps=TRUE)
   
   # create an empty list to store the nplr models
@@ -87,7 +89,7 @@ save_AUC <- function(exp_name,
   
   for (organoid in unique(d$org_name)) {
     organoid_data = d[d$org_name == organoid, ]
-    for (condition in unique(d$condition)) {
+    
       organoid_data$Max_Concentration_log <- log10(organoid_data$conc_condition)
       
       min_organoid = min(organoid_data$mean_GR)
@@ -105,10 +107,9 @@ save_AUC <- function(exp_name,
       
       fit_list[[organoid]] <- fit
     }
-  }
   
-  # create an empty data frame to store the fitted values
   dataframe_fit <- data.frame()
+  dataframe_fit_metrics <- data.frame()
   
   # loop over the nplr models and extract the fitted values
   for (i in seq_along(fit_list)) {
@@ -130,24 +131,177 @@ save_AUC <- function(exp_name,
     # append the data frame to the main one
     dataframe_fit <- rbind(dataframe_fit, dataframe_fit_i)
     
+    #get metrics from fit and create dataframe
+    estim <- getEstimates(fit, .5)
+    GR50_log <- format(estim$x, digits = 6, scientific = TRUE) #estimate at 0.5
+    GR50_num <- as.numeric(GR50_log)
+    GR50 <- log10(GR50_num)
+    par <- getPar(fit) 
+    xmid_log <- (par$params$xmid)
+    xmid<- as.numeric(xmid_log)
+    
+    dataframe_fit_m <- data.frame(GR50, xmid)
+    dataframe_fit_m$org_name <- names(fit_list)[i]
+    dataframe_fit_metrics <- rbind(dataframe_fit_metrics, dataframe_fit_m)
+    
+    
   }
-  AUC_df <- tibble(condition = numeric(), 
-              organoid = numeric(), 
-              AUC_raw = numeric(), 
-              AUC_fit_trapezoid = numeric(), 
-              GRMax = numeric(), 
-              GR50 = numeric()
-  )
   
+  #fill df with metrics
+  metric <- d %>% dplyr::select(conc_condition, mean_GR, org_name, condition, chemo_naive) %>%
+    mutate(mean_GR_positive=(mean_GR +1)/2)  %>% #GR range 0-1 for calculating AUC
+    group_by(org_name, condition) %>%
+    mutate(AUC = AUC(log10(conc_condition), mean_GR_positive)) %>%
+    group_by(org_name, condition) %>%
+    mutate(max_index = which.max(conc_condition),
+           GRmax = mean_GR[max_index]) %>%
+    dplyr::select(-max_index) %>%
+    group_by(org_name, condition, AUC, GRmax) %>% 
+    summarise(AUC = mean(AUC))
   
-  d
+    #dataframe for metrics only low concentrations
+  metric_lowconc <- d %>% dplyr::select(conc_condition, mean_GR, org_name, condition, chemo_naive) %>%
+    mutate(mean_GR_positive=(mean_GR +1)/2)  %>% #GR range 0-1 for calculating AUC
+    group_by(org_name, condition, chemo_naive) %>%
+    slice_min(conc_condition, n = 4) %>%
+    mutate(AUC_low = AUC(log10(conc_condition), mean_GR_positive)) %>% 
+    dplyr::select(-condition) %>%
+    mutate(max_index = which.max(conc_condition),
+           GRmax_low = mean_GR[max_index]) %>%
+    dplyr::select(-max_index) %>%
+    group_by(org_name, AUC_low, GRmax_low, chemo_naive) %>%
+    summarise(AUC_low = mean(AUC_low))
+  
+  #merge dataframe non-fitted metrics with fitted metrics
+  metric_metriclowconc <- merge(metric, metric_lowconc, by="org_name") 
+  
+  #merge dataframe non-fitted metrics with fitted metrics
+  dataframe_metrics <- merge(metric_metriclowconc, dataframe_fit_metrics, by="org_name") 
+  
+  #merge dataframe conditions
+  dataframe_conditions <- rbind(dataframe_conditions, dataframe_metrics)
+  
+  }
+  
+  # save the file
+  write.xlsx(dataframe_conditions, file.path(metrics_dir, "Analyse1_test.xlsx"))
+
+ 
+  
 }
-d <- save_AUC("RAS25")
 
-#   
-#   
+save_metrics("Analyse1_test")
 
-# }
+
+
+
+
+#make plot
+metrics_df <- read_excel(file.path(metrics_dir, "Analyse1_test.xlsx"))
+metrics_df_norm <- metrics_df
+metrics_bi_alp <- metrics_df %>% filter(condition == "binimetinib_alpelisib")
+
+#Use Mann-Whitney U-test (non-parametric alternative to 2-sample t-test)
+results_chemo_naive <- wilcox.test(AUC ~ factor(chemo_naive), data=metrics_bi_alp) 
+results_chemo_naive$p.value <- round(results_chemo_naive$p.value, digits = 3)
+results_chemo_naive$p.value
+
+metrics_df_norm = metrics_df_norm %>% dplyr::select(org_name,condition,chemo_naive,AUC,GRmax,AUC_low,GRmax_low,GR50,xmid)
+
+#normalize per condition IN PROGRESS
+for(i in 4:ncol(metrics_df_norm)) {       
+  metrics_df_norm[i] <- (metrics_df_norm[i]- min(metrics_df_norm[i], na.rm=TRUE))/(max(metrics_df_norm[i], na.rm=TRUE)-min(metrics_df_norm[i], na.rm=TRUE))
+
+  
+  }
+
+metrics_df_norm %>%
+  group_by(condition) %>%
+  mutate_at(vars(4:last_col()), list(~(. - min(., na.rm = TRUE)) / (max(., na.rm = TRUE) - min(., na.rm = TRUE))))
+
+df %>%
+  group_by(group_var) %>%
+  mutate_at(vars(4:last_col()), list(~(. - min(., na.rm = TRUE)) / (max(., na.rm = TRUE) - min(., na.rm = TRUE))))
+
+
+
+make_boxplots <- function(data){
+
+boxplot_AUC_low <- ggplot(data, aes(y=AUC_low, x=chemo_naive, color = chemo_naive)) + 
+  facet_grid(~condition) +
+  geom_boxplot(size =0.6, outlier.shape = NA) +
+  geom_jitter(position=position_jitter(0.1))+
+  #stat_summary(fun = mean, geom = "text", col = "red", vjust = +2, aes(label = paste("Mean:", round(..y.., digits = 2))))+
+  #annotate("text", x = 1, y = 1.7, label = substitute(paste(italic('p'), " = ...")), size =3)+
+  labs(title = "", y=expression(GR[AUC]*" low conc."), x = "Chemo-exposure") + 
+  theme_classic() 
+boxplot_AUC_low
+
+boxplot_AUC <- ggplot(data, aes(y=AUC, x=chemo_naive, color = chemo_naive)) + 
+  facet_grid(~condition) +
+  geom_boxplot(size =0.6, outlier.shape = NA) +
+  geom_jitter(position=position_jitter(0.1))+
+  #stat_summary(fun = mean, geom = "text", col = "red", vjust = +2, aes(label = paste("Mean:", round(..y.., digits = 2))))+
+  #annotate("text", x = 1, y = 1.7, label = substitute(paste(italic('p'), " = ...")), size =3)+
+  labs(title = "", y=expression(GR[AUC]), x = "Chemo-exposure") + 
+  theme_classic() 
+boxplot_AUC
+
+boxplot_GRmax_low <- ggplot(data, aes(y=GRmax_low, x=chemo_naive, color = chemo_naive)) + 
+  facet_grid(~condition) +
+  geom_boxplot(size =0.6, outlier.shape = NA) +
+  geom_jitter(position=position_jitter(0.1))+
+  #stat_summary(fun = mean, geom = "text", col = "red", vjust = +2, aes(label = paste("Mean:", round(..y.., digits = 2))))+
+  #annotate("text", x = 1, y = 1.7, label = substitute(paste(italic('p'), " = ...")), size =3)+
+  labs(title = "", y=expression(GR[max]* "low conc."), x = "Chemo-exposure") + 
+  theme_classic() 
+boxplot_GRmax_low
+
+boxplot_GRmax <- ggplot(data, aes(y=GRmax, x=chemo_naive, color = chemo_naive)) + 
+  facet_grid(~condition) +
+  geom_boxplot(size =0.6, outlier.shape = NA) +
+  geom_jitter(position=position_jitter(0.1))+
+  #stat_summary(fun = mean, geom = "text", col = "red", vjust = +2, aes(label = paste("Mean:", round(..y.., digits = 2))))+
+  #annotate("text", x = 1, y = 1.7, label = substitute(paste(italic('p'), " = ...")), size =3)+
+  labs(title = "", y=expression(GR[max]), x = "Chemo-exposure") + 
+  theme_classic() 
+boxplot_GRmax
+
+boxplot_GR0 <- ggplot(data, aes(y=GR50, x=chemo_naive, color = chemo_naive)) + 
+  facet_grid(~condition) +
+  geom_boxplot(size =0.6, outlier.shape = NA) +
+  geom_jitter(position=position_jitter(0.1))+
+  #stat_summary(fun = mean, geom = "text", col = "red", vjust = +2, aes(label = paste("Mean:", round(..y.., digits = 2))))+
+  #annotate("text", x = 1, y = 1.7, label = substitute(paste(italic('p'), " = ...")), size =3)+
+  labs(title = "", y=expression(GR["0-intercept"]), x = "Chemo-exposure") + 
+  theme_classic() 
+boxplot_GR0
+
+library(cowplot)
+library(Cairo)
+grid_boxplots <- plot_grid(
+  boxplot_AUC,
+  boxplot_AUC_low,
+  boxplot_GRmax,
+  boxplot_GRmax_low,
+  boxplot_GR0,
+  ncol = 1,
+  nrow = 5,
+  labels = c(''))
+
+setwd(metrics_plot_dir)
+tiff(file = "boxplots_metrics_QCpassed_norm.tiff",
+     units="in",
+     width = (27),
+     height = (15),
+     res=300) 
+print(grid_boxplots)
+dev.off()
+
+}
+
+make_boxplots(metrics_df_norm)
+
 #metrics
 
 # organoid_data_AUC$GR_positive <- (((organoid_data_AUC$x)+1)/2) #GR range 0-1 for calculating AUC
