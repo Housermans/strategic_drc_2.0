@@ -52,13 +52,15 @@ Get_QC_organoid <- function(exp_id, organoid_name) {
                                             "DMSO_1",
                                             "D0_ctrl",
                                             "Fluorescence")) %>%
-                    dplyr::select(Organoid, condition, conc_condition, GR) %>%
+                    dplyr::select(Organoid, condition, conc_condition, GR, viab) %>%
                     mutate(STR_ID = exp_id,
                            org_name = Organoid,
                            conc_condition = signif(conc_condition,4)) %>%
                     group_by(STR_ID, org_name, condition, conc_condition) %>%
                     summarise(mean_GR = mean(GR), 
-                              sem_GR = sd(GR) / sqrt(n()))
+                              mean_viab = mean(viab),
+                              sem_GR = sd(GR) / sqrt(n()),
+                              sem_viab = sd(viab) / sqrt(n()))
                   
   no_avg_df <- filter(organoid_data, 
                       !condition %in% c("Tween", 
@@ -66,16 +68,20 @@ Get_QC_organoid <- function(exp_id, organoid_name) {
                                         "D0_ctrl",
                                         "Fluorescence")) %>%
               mutate(conc_condition = signif(conc_condition, 4), org_name = Organoid, STR_ID = exp_id) %>%
-              dplyr::select(STR_ID, org_name, GR, condition, conc_condition) %>%
+              dplyr::select(STR_ID, org_name, GR, viab, condition, conc_condition) %>%
               arrange(condition)
   
   # calculate the lower and upper bounds of the 95% confidence interval
   lower_bound_95 <- experiment_df$mean_GR - 1.96 * experiment_df$sem_GR
   upper_bound_95 <- experiment_df$mean_GR + 1.96 * experiment_df$sem_GR
+  lower_bound_95_viab <- experiment_df$mean_viab - 1.96 * experiment_df$sem_viab
+  upper_bound_95_viab <- experiment_df$mean_viab + 1.96 * experiment_df$sem_viab
   # add the new columns to the tibble
   experiment_df <- tibble::add_column(experiment_df, 
                               lower_bound_95 = lower_bound_95,
-                              upper_bound_95 = upper_bound_95)
+                              upper_bound_95 = upper_bound_95,
+                              lower_bound_95_viab = lower_bound_95_viab,
+                              upper_bound_95_viab = upper_bound_95_viab)
   
   # Create a list of dataframes with names as worksheet names
   dfs <- list(experimental_data_average = experiment_df, experimental_data_individual = no_avg_df)
@@ -184,8 +190,7 @@ read_experiment <- function(exp_id) {
 }
 
 ### USE THIS TO READ OUT A SPECIFIC EXPERIMENT 
-read_experiment("STR24A")
-read_experiment("STR24B")
+read_experiment("MHUI06")
 
 ### USE THIS TO PROCESS ALL EXPERIMENTS
 # all_exp <- unique(overview$STR_ID)

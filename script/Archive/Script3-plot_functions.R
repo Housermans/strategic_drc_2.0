@@ -133,7 +133,7 @@ plot_per_condition_factorial <- function(df, condition, colorby="chemo_naive") {
   title <- condition
   
   in1 <- length(unlist(unique(df[colorby])))               # Amount of default colors
-  hex_codes1 <- hue_pal()(n1)                             # Identify hex codes
+  hex_codes1 <- hue_pal()(in1)                             # Identify hex codes
   
   # create an empty list to store the nplr models
   fit_list <- list()
@@ -289,7 +289,7 @@ plot_per_condition_numeric <- function(df, condition, colorby="RAS_pct_change") 
   return(p)
 }
 
-plot_multiple <- function(exp_name, select_on="Analyse", selection_value=1, colorby="chemo_naive", color_numeric=FALSE) {
+plot_multiple <- function(exp_name, select_on="Passed_QC", selection_value=1, colorby="chemo_naive", color_numeric=FALSE) {
   if (!dir.exists(file.path(plot_output, exp_name))) {
     dir.create(file.path(plot_output, exp_name))
   }
@@ -336,10 +336,13 @@ dont_plot_selected_conditions <- function(exp_name, select_on="Passed_QC", selec
   }
 }
 
-# plot_selected_conditions("RASTRIC_pct", select_on="Analyse", selected_conditions=c("Lapatinib", "Binimetinib", "Vinorelbine", "binimetinib_lapatinib", "vi_bi_la"), colorby="RAS_pct_change", color_numeric=TRUE)
+overview <- read_excel(file.path(resource_dir, "Screening_overview.xlsx"))
 
-# plot_multiple("RASTRIC_pct_all", select_on="Analyse", colorby="RAS_pct_change", color_numeric=TRUE)
-# plot_multiple("STR-D2")
+
+# plot_selected_conditions("Selection_RAS5_v3", select_on="Analyse2", selected_conditions=c("5-FU", "Oxaliplatin", "SN-38"), colorby="chemo_naive")
+plot_multiple("RAS34", select_on="Analyse")
+# plot_multiple("PassedQC2", select_on="Passed_QC")
+# plot_multiple("RAS34_double", select_on="Analyse2")
 # plot_multiple("plot_qc", select_on="Passed_QC")
 # plot_multiple("plot_all", select_on="all", colorby="Passed_QC")
 # plot_multiple("WNT", colorby="Tween_bad")

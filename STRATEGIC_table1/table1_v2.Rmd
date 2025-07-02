@@ -1,0 +1,202 @@
+---
+title: "Table1"
+author: "Maarten Huismans"
+date: "2024-06-07"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#load packages
+library(tidyverse)
+library(boot) 
+library(table1, quietly=TRUE)
+library(rmarkdown)
+library(writexl)
+library(readxl)
+
+rm(list=ls())
+
+#TODO: OPTIC RASTRIC cohort
+
+
+#Load files
+script_dir <- dirname(rstudioapi::getSourceEditorContext()$path)
+# db_clinical <- readRDS(file = file.path(script_dir,"db_clinic_only_table1.Rds"))
+db_optic_original <- readRDS(file= file.path(script_dir, "OPTIC_clinical_data.rds"))
+db_rastric_original <- read_delim(file.path(script_dir, "Gegevens_RASTRIC.csv"), delim=",")
+db_rastric_biopsyloc <- read_excel(file.path(script_dir, "rastric_biopsy_locations.xlsx"))
+db_strategic_original <- read_delim(file.path(script_dir, "STRATEGIC_overview3.csv"), delim=";")
+
+
+db_strategic <- db_strategic_original %>% 
+  filter(STRATEGIC_analysis == "yes") %>%
+  mutate(organoid_name = str_trim(`Organoid line`), 
+         MAPK_status = str_trim(`MAPK status`),
+         Palliative_duration = as.numeric(Palliative_duration)) %>%
+  mutate(
+    Palliative_duration = ifelse(is.na(Palliative_duration), 0, Palliative_duration),
+    Palliative_duration = case_when(
+      Palliative_duration > 100 ~ floor(Palliative_duration / 30.5),
+      TRUE ~ Palliative_duration
+      ),
+  ) %>%
+  dplyr::select(organoid_name, `Sample type`, MAPK_status, Adjuvant_received, 
+                Adjuvant_5FU, Adjuvant_Ox, Palliative_duration, STRATEGIC_analysis)
+  
+db_optic <- db_optic_original %>% mutate(
+  creation_date = dmy(DA_Biopsy),
+  creation_year = year(creation_date),
+  Age = creation_year - Birth_year, 
+  first_line_date = dmy(DA_StartTreat1),
+  Sex = Gender_Pt, 
+  organoid_name = ID_OPTIC,
+  origin_location = Biopsy_tissue, 
+  alive = case_when(
+    Site == "UMC Utrecht" & DA_Death == "" ~ TRUE, 
+    DA_Death == "" ~ NA,
+    DA_Death != "" ~ FALSE
+  ),
+  date_of_death = dmy(DA_Death), 
+  OS = ifelse(is.na(alive), NA, ifelse(alive, as.integer(floor(interval(first_line_date, today()) / months(1))), as.integer(floor(interval(first_line_date, date_of_death) / months(1)))))) %>%
+  dplyr::select(organoid_name, Age, Sex, Sidedness, origin_location, alive, first_line_date, date_of_death, OS)
+
+db_rastric <- db_rastric_original %>%
+  mutate(
+    organoid_name = str_replace(SUBJID, "RAS0", "RAS"),
+    creation_date = dmy(regisdat),
+    birthday= dmy(dob), 
+    Age = as.integer(floor(interval(birthday, creation_date) / years(1))), 
+    # PS = str_sub(whops_bl, -1, -1), 
+    Sidedness = case_when(
+      initmhloc %in% c("sigmoid", "descending colon") ~ "Left-sided (splenic flexure-sigmoid)",
+      initmhloc == "cecum" ~ "Right-sided (coecum-transverse colon)",
+      initmhloc %in% c("rectum", "Rectosigmoid") ~ "Rectum (rectosigmoid/rectal)",
+      TRUE ~ NA_character_
+    ),
+    # RASMut = case_when(
+    #   str_detect(krasmut, "G12") ~ "KRAS codon 12 mutation", 
+    #   str_detect(krasmut, "Gly12") ~ "KRAS codon 12 mutation",
+    #   str_detect(krasmut, "c.34G") ~ "KRAS codon 12 mutation", 
+    #   str_detect(krasmut, "c.35G") ~ "KRAS codon 12 mutation", 
+    #   str_detect(krasmut, "exon 2") ~ "KRAS codon 12 mutation", 
+    #   str_detect(krasmut, "G13") ~ "KRAS codon 13 mutation", 
+    #   str_detect(krasmut, "c.38G") ~ "KRAS codon 13 mutation",
+    #   str_detect(krasmut, "436G") ~ "KRAS non-exon 2 mutation",
+    #   str_detect(krasmut, "183A") ~ "KRAS non-exon 2 mutation",
+    #   str_detect(krasmut, "873G") ~ "KRAS wildtype amplification",
+    #   str_detect(nrasmut, "61") ~ "NRAS mutation"
+    # ), 
+    # nmeta_sites = case_when(
+    #   nmeta > 3 ~ "≥ 4",
+    #   .default = as.character(nmeta)
+    # ),
+    # nmeta_sites = factor(nmeta_sites, levels=c("1", "2", "3", "≥ 4")),
+    Sex = sex
+  ) %>% 
+  left_join(db_rastric_biopsyloc, c("organoid_name" = "Study Number")) %>%
+  mutate(
+    origin_location = str_replace(Location, "metastasis", ""),
+    origin_location = str_replace(origin_location, "l biopsy", ""),
+    origin_location = case_when(
+      str_detect(origin_location,"(skin only)") ~ NA_character_, 
+      .default = origin_location
+    ), 
+    alive = FALSE,
+    first_line_date = first_Pall_therapy_date,
+    date_of_death = overlijden,
+    OS = as.integer(floor(interval(first_Pall_therapy_date, date_of_death) / months(1)))) %>%
+  mutate(
+    origin_location = str_replace(origin_location, "\\(.*?\\)", ""),
+  ) %>%
+  dplyr::select(organoid_name, Age, Sex, Sidedness, origin_location, alive, first_line_date, date_of_death, OS)
+
+# Combine all data frames
+db_combined <- db_strategic %>%
+  left_join(db_optic, by = "organoid_name") %>%
+  left_join(db_rastric, by = "organoid_name") %>%
+  mutate(
+    Age = coalesce(Age.x, Age.y),
+    Sex = coalesce(Sex.x, Sex.y),
+    Sidedness = coalesce(Sidedness.x, Sidedness.y),
+    origin_location = coalesce(origin_location.x, origin_location.y),
+    alive = coalesce(alive.x, alive.y),
+    first_line_date = coalesce(first_line_date.x, first_line_date.y),
+    date_of_death = coalesce(date_of_death.x, date_of_death.y),
+    OS = coalesce(OS.x, OS.y),
+    `Sample type` = str_to_title(`Sample type`)
+  ) %>%
+  dplyr::select(-Age.x, -Age.y, -Sex.x, -Sex.y, -Sidedness.x, -Sidedness.y, -origin_location.x, -origin_location.y,
+                -date_of_death.x, -date_of_death.y, -OS.x, -OS.y, -alive.x, -alive.y, -first_line_date.x, -first_line_date.y) %>%
+  mutate(
+    Sidedness = ifelse(Sidedness == "", "Unknown", Sidedness), 
+    MAPK_status = case_when(
+      MAPK_status == "KRAS" ~ "RAS-mutant", 
+      MAPK_status == "NRAS" ~ "RAS-mutant", 
+      MAPK_status == "WT" ~ "RAS/BRAF-wildtype",
+      MAPK_status == "WT KRAS amplification" ~ "KRAS wildtype amplification"),
+    origin_location = str_trim(origin_location)
+  ) %>% 
+  filter(STRATEGIC_analysis == "yes") 
+
+# # Identify and print non-matching names
+# non_matching_strategic_optic <- db_strategic %>%
+#   anti_join(db_optic, by = "organoid_name")
+# 
+# non_matching_strategic_rastric <- db_strategic %>%
+#   anti_join(db_rastric, by = "organoid_name")
+# 
+# cat("Non-matching names between strategic and optic:\n")
+# print(non_matching_strategic_optic)
+# 
+# cat("Non-matching names between strategic and rastric:\n")
+# print(non_matching_strategic_rastric)
+
+label(db_combined$Age) <- "Age" 
+label(db_combined$Sex) <- "Sex" 
+label(db_combined$Sidedness) <- "Primary tumour location"
+label(db_combined$Adjuvant_received) <- "Adjuvant chemotherapy"
+label(db_combined$MAPK_status) <- "Mutational status"
+label(db_combined$Palliative_duration) <- "Months of palliative chemotherapy"
+label(db_combined$origin_location) <- "Location of metastasis biopsy"
+
+write_xlsx(db_combined, path=file.path(script_dir,"combined_table1.xlsx"))
+
+# list_of_NA <- db_combined %>%
+#   filter(is.na(date_of_death)) %>%
+#   dplyr::select(organoid_name)
+# 
+# write_xlsx(list_of_NA, path=file.path(script_dir,"date_of_death_missing.xlsx"))
+
+
+my.render.cont <- function(x) {
+  with(stats.default(x), 
+       c("",
+         
+         
+         "Median (Min, Max)" = sprintf("%s (%s, %s)",
+                                       round_pad(MEDIAN, 0), 
+                                       round_pad(MIN, 0), 
+                                       round_pad(MAX, 0)))
+  )
+}
+
+
+
+table_combined <- table1(~ (Age) + (Sex)  + (Sidedness) + (MAPK_status) + (origin_location) + (Adjuvant_received) + (Palliative_duration) | `Sample type`, 
+                         data=db_combined, 
+                         render.continuous=my.render.cont)
+
+table_combined
+```
+
+
+## Table 1
+
+
+
+```{r pressure, echo=FALSE}
+table_combined
+```
+

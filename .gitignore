@@ -7,3 +7,34 @@
 3_QC/**
 4_plot_data/**
 5_plot_output/**
+6_metrics/**
+
+# Data files
+*.xlsx
+*.xls
+*.csv
+*.tsv
+*.rds
+*.xml
+*.pdf
+*.txt
+*.ndpi
+*.png
+*.tdd
+*.pzfx
+*.Rdata
+*.html
+
+# Temporary files
+~$*
+.DS_Store
+*.tmp
+*.temp
+
+# Keep folder structure but ignore data files
+!**/
+!.gitignore
+!*.R
+!*.Rmd
+!*.md
+!*.Rproj

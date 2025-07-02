@@ -6,6 +6,7 @@ library(scales)
 library(drc)
 library(nplr)
 library(patchwork)
+library(tidyr)
 
 rm(list=ls())
 
@@ -101,16 +102,38 @@ select_files_and_add_metadata <- function(select_on = "Analyse", plot_condition 
 
 aggregate_by <- function(select_on = "Analyse", plot_condition = "all", selection_value = 1, aggregate_on = "chemo_naive") {
     # calculate sem for each condition and conc_condition combination
-    d <- select_files_and_add_metadata(select_on="Passed_QC", plot_condition="all", individual_reps = T)
-
-
-
+    d <- select_files_and_add_metadata(select_on=select_on, plot_condition="all", individual_reps = T)
 
     experiment_df <- d %>%
         mutate(
           aggregate_var = aggregate_on,
           aggregate_var_status = get(aggregate_on),
-          conc_condition = signif(conc_condition, 4)) %>%
+          conc_condition = signif(conc_condition, 4)) 
+    
+    
+    for (filter_condition in unique(experiment_df$condition)) {
+      condition_df <- experiment_df %>% filter(condition == filter_condition) %>% arrange(conc_condition)
+      # print(filter_condition)
+      for (concentration in unique(condition_df$conc_condition))
+        print(concentration)
+    }
+    
+    # hypothethical approach:
+    # make a table that determines which unique concentrations are there for every condition
+    # if a condition has 8 unique concentrations, paste the concentrations in the aggregate_conc column
+    # for each of these concentrations
+    # if a condition has more than 8 unique concentration, determine which concentrations are closer than 5%
+    # then give for those pairs the highest concentration of that pair in the aggregate_conc column
+    # print for every step so I know what is going on and show me the table in the end. 
+    # then update the table which concentration should be renamed 
+    # loop over the unique concentrations in order from low to high
+    # starting from the second concentration, compare it to the former, 
+    # if the difference with the former is less than 5% different
+    # make a new concentration called "aggregate_conc" with the value of the
+    # former concetration
+    # else, just repeat the current concentration in the aggregate_conc value
+    
+    experiment_df <- experiment_df %>%
       group_by(aggregate_var, aggregate_var_status, condition, conc_condition) %>%
       summarise(mean_GR = mean(GR),
                 sem_GR = sd(GR) / sqrt(n()))
@@ -123,6 +146,102 @@ aggregate_by <- function(select_on = "Analyse", plot_condition = "all", selectio
                                         lower_bound_95 = lower_bound_95,
                                         upper_bound_95 = upper_bound_95)
 }
+
+library(dplyr)
+library(tibble)
+
+# Helper function to aggregate close concentrations
+aggregate_concentrations <- function(conc_values, tolerance = 0.05) {
+  conc_values <- sort(conc_values)
+  n <- length(conc_values)
+  
+  if (n <= 8) {
+    return(conc_values)
+  }
+  
+  print("Original concentrations:")
+  print(conc_values)
+  
+  aggregate_conc <- conc_values
+  for (i in 2:n) {
+    if (abs((conc_values[i] - conc_values[i - 1]) / conc_values[i - 1]) < tolerance) {
+      aggregate_conc[i] <- conc_values[i - 1]
+    }
+  }
+  
+  print("Aggregated concentrations:")
+  print(aggregate_conc)
+  
+  return(aggregate_conc)
+}
+
+# Main function to process and aggregate concentrations
+aggregate_by_condition <- function(select_on = "Analyse", plot_condition = "all", selection_value = 1, aggregate_on = "chemo_naive", tolerance = 0.05) {
+  # Calculate sem for each condition and conc_condition combination
+  d <- select_files_and_add_metadata(select_on = select_on, plot_condition = plot_condition, individual_reps = TRUE)
+  
+  experiment_df <- d %>%
+    mutate(
+      aggregate_var = aggregate_on,
+      aggregate_var_status = get(aggregate_on),
+      conc_condition = signif(conc_condition, 4)
+    )
+  
+  unique_conc_table <- experiment_df %>%
+    group_by(condition) %>%
+    summarise(unique_concentrations = list(unique(conc_condition)))
+  
+  print("Unique concentrations for each condition:")
+  print(unique_conc_table)
+  
+  # Aggregation process
+  aggregated_data <- experiment_df %>%
+    group_by(condition) %>%
+    group_modify(~ {
+      conc_values <- .x$conc_condition
+      aggregated_conc <- aggregate_concentrations(conc_values, tolerance)
+      .x <- mutate(.x, aggregate_conc = aggregated_conc)
+      return(.x)
+    }) %>%
+    ungroup()
+  
+  unique_conc_table_after <- aggregated_data %>%
+    group_by(condition) %>%
+    summarise(unique_concentrations = list(unique(aggregate_conc)))
+  
+  print("Aggregated concentrations:")
+  print(unique_conc_table_after)
+  
+  # Summarising the results
+  aggregated_summary <- aggregated_data %>%
+    group_by(aggregate_var, aggregate_var_status, condition, aggregate_conc) %>%
+    summarise(
+      mean_GR = mean(GR),
+      sem_GR = sd(GR) / sqrt(n()),
+      .groups = 'drop'  # Ungroup after summarise
+    )
+  
+  # Calculate the lower and upper bounds of the 95% confidence interval
+  lower_bound_95 <- aggregated_summary$mean_GR - 1.96 * aggregated_summary$sem_GR
+  upper_bound_95 <- aggregated_summary$mean_GR + 1.96 * aggregated_summary$sem_GR
+  
+  # Add the new columns to the tibble
+  aggregated_summary <- aggregated_summary %>%
+    add_column(lower_bound_95 = lower_bound_95, upper_bound_95 = upper_bound_95)
+  
+  print("Final aggregated table:")
+  print(aggregated_summary)
+  
+  return(aggregated_summary)
+}
+
+# Example usage
+experiment_df <- aggregate_by_condition()
+
+print(experiment_df)
+
+
+
 
 plot_per_condition_aggregate <- function(df, condition, colorby="aggregate_var_status") {
   df <- df[df$condition == condition, ]
@@ -156,7 +275,6 @@ plot_per_condition_aggregate <- function(df, condition, colorby="aggregate_var_s
                 silent = FALSE)
 
     fit_list[[var]] <- fit
-
   }
 
   # create an empty data frame to store the fitted values
@@ -211,15 +329,15 @@ plot_multiple <- function(exp_name, select_on="Analyse", selection_value=1, aggr
   if (!dir.exists(file.path(plot_output, exp_name))) {
     dir.create(file.path(plot_output, exp_name))
   }
-  d <- aggregate_by(select_on = select_on, aggregate_on = aggregate_on)
+  d <- aggregate_by(select_on = select_on, selection_value = aggregate_on = aggregate_on)
   for (condition in unique(d$condition)) {
     p <- plot_per_condition_aggregate(d, condition)
-    ggsave(file.path(plot_output, exp_name, paste0(condition,"_", exp_name, "_plot.png")), p, width=2100, height=2100, units="px")
+    ggsave(file.path(plot_output, exp_name, paste0(condition,"_", exp_name, "_by_", aggregate_on ,"_plot.png")), p, width=2100, height=2100, units="px")
   }
   
 }
 
-plot_multiple("aggregati0n", select_on="Passed_QC")
+plot_multiple("aggregated", select_on="Passed_QC")
 
 
 
