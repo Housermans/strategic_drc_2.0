@@ -4,8 +4,15 @@ library(dplyr)
 #version control v1: 21-06-24 updated export with OS data UMCU
 #version control v1: 11-07-24 updated export with OS data Maastricht/Radboud
 
-setwd("D:/SURFdrive/Lsmabers/PhD/OPTIC_LS/Data/Export_11_07_2024")
-OPTIC <- read.csv("Organoids_to_Predict_Treatment_r_export_20240711.csv", sep = ";", strip.white = TRUE)
+setwd("D:/SURFdrive/Lsmabers/PhD/OPTIC_LS/Data/Export_11_03_2025")
+OPTIC <- read.csv("Organoids_to_Predict_Treatment_r_export_20250311.csv", sep = ";", strip.white = TRUE)
+
+OPTIC$DA_Biopsy<- as.Date(OPTIC$DA_Biopsy, format = "%d-%m-%Y")
+OPTIC$DA_Prim <- as.Date(OPTIC$DA_Prim, format = "%d-%m-%Y")
+OPTIC$DA_Met <- as.Date(OPTIC$DA_Met, format = "%d-%m-%Y")
+OPTIC$interval_prim_met <- OPTIC$DA_Met - OPTIC$DA_Prim
+OPTIC$interval <- ifelse(OPTIC$interval>182, "Metachronous", "Synchronous")
+
 OPTIC_1  <- OPTIC[OPTIC$f_evalu_evalu_please_sel.Organoid.was.established == 1, ]
 
 script_dir <- dirname(rstudioapi::getSourceEditorContext()$path)

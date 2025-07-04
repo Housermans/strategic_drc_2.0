@@ -91,7 +91,9 @@ metrics_wide <- pivot_wider(metrics, names_from = condition, values_from = c(AUC
 
 #WGS data
 mat_HMF_treatment = readRDS(file.path(WGS_plot_dir,  "mat_HMF_treatment.rds"))
-WGS <- mat_HMF_treatment [-c(62, 212:214, 216:236, 238, 239, 241, 242, 245:299)]
+colnames(mat_HMF_treatment)
+
+WGS <- mat_HMF_treatment [-c(62, 212:214, 216:226, 228:236, 238, 239, 241, 242, 246:299)]
 WGS <- WGS %>% filter(WGS$org_name != "OPT0044")
 WGS <- WGS %>% filter(WGS$org_name != "OPT0404")
 
@@ -116,7 +118,7 @@ metrics_wide$org_name<- NULL
 PDO$org_name<- NULL
 PDO$STR_ID<- NULL
 
-write.xlsx(WGS, file = file.path(R2_dir, "WGS_metadata.xlsx"))
+write.xlsx(WGS, file = file.path(R2_dir, "WGS_metadata_weekfrozen.xlsx"))
 write.xlsx(PDO, file = file.path(R2_dir, "PDO_raw.xlsx"))
 write.xlsx(metrics_wide, file = file.path(R2_dir, "PDO_metrics_wide.xlsx"))
 

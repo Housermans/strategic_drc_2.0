@@ -198,6 +198,50 @@ PDO_WGS_screen_top5_all <- rbind(PDO_WGS_screen_top5_chemonaive, PDO_WGS_screen_
 
 PDO_WGS_screen_chemonaivefiltered <- PDO_WGS_screen %>% 
   filter(`Sample type`=="chemonaive")
+
+OPTIC_WGS_SBS <- read.table("D:/SURFdrive/Lsmabers/PhD/OPTIC_LS/Analyse/Plots/WGS_OPTIC/SBS_DBS_signature_contribution.txt", header = TRUE, sep = "\t", stringsAsFactors = FALSE)
+OPTIC_WGS_SBS$DBS5[OPTIC_WGS_SBS$SampleID == ""]
+
+
+grid_plot <- grid.arrange(grobs = c(list(boxplot_tml, boxplot_tmb, boxplot_svtmb, boxplot_ploidy)), ncol=4)
+ggsave(file = sprintf("%s/%s.pdf", WGS_plot_dir, "boxplots_HMF_tmb_etc"), plot = grid_plot, width = 12, height = 3)
+
+#------rebuttal-----
+PDO_WGS_screen_pair <- PDO_WGS_screen %>%
+  filter(org_name == "OPT0032" | org_name == "RAS34")
+new_row <- PDO_WGS_screen_pair[1, ]
+new_row[,] <- NA
+new_row$tml <- 87
+new_row$tmbPerMb <-7.5
+new_row$org_name <- "OPT0067"
+PDO_WGS_screen_pair <- rbind(PDO_WGS_screen_pair, new_row)
+#The tumor mutational load represents the total number of somatic missense variants acrossthe whole genome of the tumor.
+#The tumor mutational burden score represents the number of all somatic variants across the whole genome of the tumor per Mb. 
+
+pair_DBS <- ggplot(subset(PDO_WGS_screen_pair, org_name != "OPT0067"), aes(x = org_name, y = DBS5)) +
+  geom_bar(stat = "identity", fill = "#7FBFF5") +
+  labs(title = "DBS5\nduring treatment", x = "PDO", y = "Abs. contribution") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+long_data <- pivot_longer(PDO_WGS_screen_pair, cols = c(tml, tmbPerMb),
+                          names_to = "metric", values_to = "value")
+long_data$metric <- factor(long_data$metric, levels = c("tml", "tmbPerMb"))
+long_data$metric <- recode(long_data$metric,
+                           "tmbPerMb" = "tmb per Mb")
+# Facet plot
+pair_tml <- ggplot(long_data, aes(x = org_name, y = value, group = 1)) +
+  geom_line(color = "black") +
+  geom_point(color = "black") +
+  facet_wrap(~metric, scales = "free_y", ncol = 2) +  # 2 kolommen, naast elkaar
+  labs(title = "Tml & tmb during treatment", x = "PDO", y = "value") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "none")
+
+pair <- grid.arrange(pair_DBS, pair_tml, ncol = 2, widths = c(1, 2))  # naast elkaar
+ggsave(file = sprintf("%s/%s.pdf", WGS_plot_dir, "pair"), plot = pair, width = 6, height = 3)
+
 #------WGS data PDO plots-----
 
 #first test normality
